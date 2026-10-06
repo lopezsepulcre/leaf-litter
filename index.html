@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>Leaf Litter Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow field-datasheet column; the scene canvas is the hero; flagging-tape orange marks actions */
+:root {
+  --bg: #eef0ea;
+  --surface: #f8f9f5;
+  --ink: #1f241c;
+  --muted: #5d6656;
+  --line: #cfd4c7;
+  --tape: #d9541a;
+  --tape-ink: #ffffff;
+  --camo: #8a6a3f;
+  --consp: #2f7d6d;
+  --good: #2f7d4a;
+  --bad: #b23a2a;
+  --display: "Familjen Grotesk", "Arial Narrow", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15130f; --surface: #1e1b16; --ink: #ece6da; --muted: #a39b8b; --line: #39342b;
+    --tape: #f06a2e; --tape-ink: #1a0f08; --camo: #c49a62; --consp: #4fb39d; --good: #5cbf7a; --bad: #e0705e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15130f; --surface: #1e1b16; --ink: #ece6da; --muted: #a39b8b; --line: #39342b;
+  --tape: #f06a2e; --tape-ink: #1a0f08; --camo: #c49a62; --consp: #4fb39d; --good: #5cbf7a; --bad: #e0705e;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 16px/1.5 var(--body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 40px; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font: 700 clamp(1.6rem, 5vw, 2.2rem)/1.05 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font: 700 1.25rem/1.2 var(--display); margin: 0; text-wrap: balance; }
+.eyebrow { font: 600 0.72rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.tabs { display: flex; gap: 6px; }
+.tab { font: 600 0.8rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; background: none; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+.tab[aria-selected="true"] { color: var(--ink); border-color: var(--ink); }
+p { margin: 0; max-width: 62ch; }
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+.stack { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font-family: var(--body); }
+.btn { font: 700 1rem/1 var(--body); padding: 14px 20px; border-radius: 10px; border: 0; cursor: pointer; background: var(--tape); color: var(--tape-ink); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+.btn.warn { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, .tab:focus-visible, canvas:focus-visible { outline: 3px solid var(--tape); outline-offset: 2px; }
+.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; max-width: 62ch; }
+.chip { display: inline-flex; align-items: center; gap: 8px; font: 600 0.78rem/1.2 var(--mono); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.chip.ok::before { background: var(--good); }
+.chip.warn { color: var(--tape); border-color: color-mix(in srgb, var(--tape) 45%, var(--line)); }
+.chip.warn::before { background: var(--tape); }
+
+.stage { display: grid; gap: 10px; }
+.stagebar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: 600 0.85rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.canvas-box { position: relative; width: 100%; max-width: 100%; aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden; background: #2b2118; touch-action: manipulation; }
+canvas#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.feedback { min-height: 1.5em; font: 700 1rem/1.5 var(--body); }
+.feedback.hit { color: var(--good); }
+.feedback.miss { color: var(--bad); }
+
+.score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.score .big { font: 700 3rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.chart-box { width: 100%; overflow-x: auto; }
+svg.chart { width: 100%; height: auto; display: block; min-width: 300px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+textarea { width: 100%; min-height: 120px; font: 0.78rem/1.4 var(--mono); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; resize: vertical; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stat { border-top: 2px solid var(--line); padding-top: 8px; }
+.stat b { display: block; font: 700 1.6rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 0.8rem; color: var(--muted); }
+table.est { border-collapse: collapse; font: 0.85rem/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+table.est td, table.est th { padding: 4px 14px 4px 0; text-align: left; border-bottom: 1px solid var(--line); }
+table.est th { color: var(--muted); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="stack" style="gap:6px">
+      <span class="eyebrow">EcoEvoStats · Detection survey</span>
+      <h1>Leaf Litter Search</h1>
+    </div>
+    <div class="tabs" id="tabs" hidden>
+      <button class="tab" id="tab-play" aria-selected="true">Play</button>
+      <button class="tab" id="tab-dash" aria-selected="false">Class results</button>
+    </div>
+  </header>
+
+  <!-- INTRO -->
+  <section id="v-intro" class="stack">
+    <div class="canvas-box"><canvas id="preview" aria-label="Example leaf litter scene with a beetle"></canvas></div>
+    <p>Every scene is a 30 cm patch of forest floor. Most hide one ground beetle. Some are small and brown like the leaves; some are bigger or darker. You are the survey observer.</p>
+    <ol class="steps">
+      <li>A scene flashes for <b>1.5 seconds</b>.</li>
+      <li>Tap where you saw the beetle, or tap <b>No beetle</b>.</li>
+      <li>27 scenes, about two minutes. Some scenes are empty.</li>
+    </ol>
+    <div class="row">
+      <button class="btn" id="btn-start">Start the survey</button>
+      <span class="chip" id="save-chip">Checking data saving…</span>
+    </div>
+    <p class="muted small" id="intro-note">Two practice scenes come first. They are not recorded.</p>
+  </section>
+
+  <!-- GAME -->
+  <section id="v-game" class="stage" hidden>
+    <div class="stagebar"><span id="progress">Practice 1 of 2</span><span id="phase">Get ready</span></div>
+    <div class="canvas-box"><canvas id="scene" tabindex="0" aria-label="Search scene. Tap where the beetle was."></canvas></div>
+    <div class="row" style="justify-content:space-between">
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <button class="btn ghost" id="btn-none" disabled>No beetle</button>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section id="v-end" class="stack" hidden>
+    <div class="score"><span class="big" id="score">0 / 24</span><span class="muted">beetles found</span></div>
+    <p id="end-msg" class="muted"></p>
+    <div class="panel">
+      <h2>Your detection record</h2>
+      <div class="chart-box" id="my-chart"></div>
+      <div class="legend"><span><i style="background:var(--camo)"></i>Camouflaged</span><span><i style="background:var(--consp)"></i>Conspicuous</span></div>
+    </div>
+    <div class="row"><span class="chip" id="end-chip"></span></div>
+    <div class="panel" id="fallback" hidden>
+      <h2>Send your data</h2>
+      <p class="small">Your results could not be saved automatically. Copy these rows and paste them into the class sheet your instructor shared.</p>
+      <textarea id="csv-out" readonly aria-label="Your data as CSV rows"></textarea>
+      <div class="row"><button class="btn" id="btn-copy">Copy my rows</button><span class="small muted" id="copy-msg"></span></div>
+    </div>
+    <div class="row"><button class="btn ghost" id="btn-again">Play again (not recorded)</button></div>
+  </section>
+
+  <!-- DASHBOARD (owner) -->
+  <section id="v-dash" class="stack" hidden>
+    <div class="stats">
+      <div class="stat"><b id="d-obs">0</b><span>observers finished</span></div>
+      <div class="stat"><b id="d-live">0</b><span>still searching</span></div>
+      <div class="stat"><b id="d-trials">0</b><span>beetle scenes recorded</span></div>
+      <div class="stat"><b id="d-fa">–</b><span>false alarms on empty scenes</span></div>
+    </div>
+    <div class="panel">
+      <h2>Class detection curve</h2>
+      <p class="small muted">Dots are the share of searches that found the beetle at each size. Lines are a binomial GLM fitted live: found ~ beetle length + contrast.</p>
+      <div class="chart-box" id="class-chart"></div>
+      <div class="legend"><span><i style="background:var(--camo)"></i>Camouflaged</span><span><i style="background:var(--consp)"></i>Conspicuous</span></div>
+      <div style="overflow-x:auto" id="est-box"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="btn-dl">Download CSV</button>
+      <button class="btn warn" id="btn-clear">Clear all responses</button>
+      <span class="small muted" id="dash-msg"></span>
+    </div>
+    <div class="panel" id="dl-fallback" hidden>
+      <p class="small">Download is not available here. Copy the CSV instead.</p>
+      <textarea id="dl-text" readonly aria-label="Class data as CSV"></textarea>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ---------- Design constants ----------
+// Paste your Google Apps Script web app URL between the quotes:
+const ENDPOINT = "https://script.google.com/macros/s/AKfycby_PciOQhUtc-aN280OULHiUKbB7_1mQDhZ8LrWhOebeRXvgBykP235eiPXlxVvFMfKxg/exec";
+const SHEET_ON = /^https:\/\/script\.google\.com\//.test(ENDPOINT);
+const EXPOSE_MS = 1500;
+const FIX_MS = 650;
+const REVEAL_MS = 900;
+const PLOT_MM = 300;                         // scene width represents 30 cm of forest floor
+const SIZES = [0.022, 0.030, 0.040, 0.052, 0.068, 0.090]; // beetle length as fraction of scene width
+const CONTRASTS = ["camouflaged", "conspicuous"];
+const REPS = 2, N_BLANK = 3;
+const HIT_R = 0.09;                          // tap tolerance, fraction of width
+
+// ---------- Seeded randomness ----------
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const mmOf = f => Math.round(f * PLOT_MM * 10) / 10;
+
+// ---------- Scene catalogue (identical for everyone) ----------
+const SCENES = [];
+CONTRASTS.forEach((c, ci) => SIZES.forEach((s, si) => { for (let r = 0; r < REPS; r++) {
+  const seed = 9100 + ci * 100 + si * 10 + r; const R = rng(seed * 7 + 3);
+  SCENES.push({ id: `${c.slice(0, 3)}${si + 1}${String.fromCharCode(97 + r)}`, present: 1, contrast: c, size: s, mm: mmOf(s), seed,
+    x: 0.1 + R() * 0.8, y: 0.12 + R() * 0.76, rot: R() * Math.PI * 2 });
+}}));
+for (let b = 0; b < N_BLANK; b++) SCENES.push({ id: `blank${b + 1}`, present: 0, contrast: "", size: 0, mm: null, seed: 9900 + b, x: null, y: null, rot: 0 });
+const PRACTICE = [
+  { id: "p1", present: 1, contrast: "conspicuous", size: 0.1, mm: 30, seed: 4242, x: 0.3, y: 0.4, rot: 0.6, practice: true },
+  { id: "p2", present: 1, contrast: "camouflaged", size: 0.08, mm: 24, seed: 4343, x: 0.72, y: 0.62, rot: 2.2, practice: true },
+];
+const N_TARGET = SCENES.filter(s => s.present).length;
+
+// ---------- Drawing ----------
+function hsl(h, s, l, a = 1) { return `hsla(${h},${s}%,${l}%,${a})`; }
+function leafPath(ctx, len, wid) { ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.quadraticCurveTo(0, -wid, len / 2, 0); ctx.quadraticCurveTo(0, wid, -len / 2, 0); ctx.closePath(); }
+function drawLitter(ctx, W, H, seed) {
+  const R = rng(seed);
+  ctx.fillStyle = "#33251a"; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 90; i++) { ctx.fillStyle = hsl(28, 30, 10 + R() * 14, 0.6); ctx.beginPath(); ctx.arc(R() * W, R() * H, W * (0.004 + R() * 0.01), 0, 7); ctx.fill(); }
+  const n = 460;
+  for (let i = 0; i < n; i++) {
+    const x = R() * W, y = R() * H, len = W * (0.04 + R() * 0.08), wid = len * (0.28 + R() * 0.24), rot = R() * Math.PI * 2;
+    const grey = R() < 0.15;
+    const h = grey ? 35 : 18 + R() * 24, s = grey ? 8 + R() * 10 : 30 + R() * 30, l = 16 + R() * 34;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    leafPath(ctx, len, wid); ctx.fillStyle = hsl(h, s, l); ctx.fill();
+    ctx.strokeStyle = hsl(h, s, Math.max(6, l - 12), 0.6); ctx.lineWidth = Math.max(0.6, W * 0.0012); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, 0); ctx.stroke();
+    if (R() < 0.4) { ctx.fillStyle = hsl(h, s, Math.max(5, l - 14), 0.5); ctx.beginPath(); ctx.ellipse((R() - 0.5) * len * 0.5, (R() - 0.5) * wid * 0.6, len * 0.08, wid * 0.18, 0, 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = R() * W, y = R() * H, len = W * (0.06 + R() * 0.14), rot = R() * Math.PI;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.strokeStyle = hsl(25, 30, 12 + R() * 14); ctx.lineCap = "round";
+    ctx.lineWidth = W * (0.003 + R() * 0.004); ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, (R() - 0.5) * len * 0.1); ctx.stroke(); ctx.restore();
+  }
+}
+function drawBeetle(ctx, W, sc) {
+  const L = sc.size * W, x = sc.x * W, y = sc.y * (W * 0.75), R = rng(sc.seed + 17);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(sc.rot);
+  const camo = sc.contrast === "camouflaged";
+  const h = camo ? 26 + R() * 8 : 172, s = camo ? 34 + R() * 10 : 48, l = camo ? 15 + R() * 4 : 26;
+  const body = hsl(h, s, l), dark = hsl(h, s, Math.max(5, l - 12));
+  ctx.strokeStyle = dark; ctx.lineCap = "round"; ctx.lineWidth = Math.max(0.8, L * 0.035);
+  for (const sgn of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const yy = -0.18 * L + k * 0.2 * L; ctx.beginPath(); ctx.moveTo(sgn * 0.18 * L, yy);
+    ctx.lineTo(sgn * 0.38 * L, yy + (k - 1) * 0.12 * L); ctx.lineTo(sgn * 0.46 * L, yy + (k - 1) * 0.22 * L); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(-0.04 * L, -0.5 * L); ctx.lineTo(-0.16 * L, -0.66 * L); ctx.moveTo(0.04 * L, -0.5 * L); ctx.lineTo(0.16 * L, -0.66 * L); ctx.stroke();
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(0, 0.1 * L, 0.27 * L, 0.36 * L, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -0.3 * L, 0.2 * L, 0.13 * L, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(10,6,3,0.7)"; ctx.lineWidth = Math.max(0.8, L * 0.03); ctx.beginPath(); ctx.ellipse(0, 0.1 * L, 0.27 * L, 0.36 * L, 0, 0, 7); ctx.stroke();
+  ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(0, -0.45 * L, 0.085 * L, 0, 7); ctx.fill();
+  ctx.strokeStyle = dark; ctx.lineWidth = Math.max(0.6, L * 0.02); ctx.beginPath(); ctx.moveTo(0, -0.24 * L); ctx.lineTo(0, 0.45 * L); ctx.stroke();
+  if (camo) { ctx.fillStyle = "rgba(255,235,200,0.22)"; ctx.beginPath(); ctx.ellipse(-0.1 * L, 0.02 * L, 0.05 * L, 0.18 * L, 0, 0, 7); ctx.fill(); for (let i = 0; i < 5; i++) { ctx.fillStyle = hsl(h, s, Math.max(6, l - 10 + R() * 16), 0.7); ctx.beginPath(); ctx.arc((R() - 0.5) * 0.36 * L, (R() - 0.3) * 0.5 * L, L * (0.03 + R() * 0.04), 0, 7); ctx.fill(); } }
+  else { ctx.fillStyle = "rgba(200,255,240,0.5)"; ctx.beginPath(); ctx.ellipse(-0.1 * L, 0.02 * L, 0.055 * L, 0.2 * L, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(-0.07 * L, -0.31 * L, 0.06 * L, 0.035 * L, 0, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+function drawMask(ctx, W, H, seed) {
+  const R = rng(seed + 555), t = Math.max(6, W / 48);
+  for (let y = 0; y < H; y += t) for (let x = 0; x < W; x += t) { ctx.fillStyle = hsl(25 + R() * 15, 15 + R() * 20, 14 + R() * 30); ctx.fillRect(x, y, t + 1, t + 1); }
+}
+function drawFix(ctx, W, H) {
+  ctx.fillStyle = "#2b2118"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = Math.max(2, W * 0.004);
+  const c = W * 0.025; ctx.beginPath(); ctx.moveTo(W / 2 - c, H / 2); ctx.lineTo(W / 2 + c, H / 2); ctx.moveTo(W / 2, H / 2 - c); ctx.lineTo(W / 2, H / 2 + c); ctx.stroke();
+}
+function sizeCanvas(cv) {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.width * 0.75 * dpr);
+  return { ctx: cv.getContext("2d"), W: cv.width, H: cv.height, dpr };
+}
+function drawScene(cv, sc, opts = {}) {
+  const { ctx, W, H } = sizeCanvas(cv);
+  drawLitter(ctx, W, H, sc.seed);
+  if (sc.present) drawBeetle(ctx, W, sc);
+  if (opts.reveal) {
+    ctx.lineWidth = Math.max(2, W * 0.005);
+    if (sc.present) { ctx.strokeStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(sc.x * W, sc.y * H, Math.max(sc.size * W * 0.9, W * 0.035), 0, 7); ctx.stroke(); }
+    if (opts.tap) { ctx.strokeStyle = "#ffffff"; const tx = opts.tap.x * W, ty = opts.tap.y * H, c = W * 0.018; ctx.beginPath(); ctx.moveTo(tx - c, ty - c); ctx.lineTo(tx + c, ty + c); ctx.moveTo(tx + c, ty - c); ctx.lineTo(tx - c, ty + c); ctx.stroke(); }
+  }
+}
+
+// ---------- Views ----------
+const $ = id => document.getElementById(id);
+const views = ["v-intro", "v-game", "v-end", "v-dash"];
+function show(v) { views.forEach(id => { $(id).hidden = id !== v; }); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function shuffle(a, R = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+// preview at rest
+function drawPreview() { drawScene($("preview"), { ...PRACTICE[0], size: 0.07 }); }
+drawPreview();
+let rzT; window.addEventListener("resize", () => { clearTimeout(rzT); rzT = setTimeout(() => { if (!$("v-intro").hidden) drawPreview(); }, 150); });
+
+// ---------- Capabilities state ----------
+const S = { db: null, user: null, downloads: null, uid: null, owner: false, canSave: false, done: false, saveMode: "checking", localCode: null };
+function localCode() {
+  if (S.localCode) return S.localCode;
+  let c = null; try { c = localStorage.getItem("lls-code"); } catch (e) {}
+  if (!c) { c = "L" + Math.random().toString(36).slice(2, 7).toUpperCase(); try { localStorage.setItem("lls-code", c); } catch (e) {} }
+  return (S.localCode = c);
+}
+function setChip(el, kind, text) { el.className = "chip" + (kind ? " " + kind : ""); el.textContent = text; }
+
+async function initCaps() {
+  const use = window.claude && window.claude.use ? n => window.claude.use(n).catch(() => null) : async () => null;
+  const [db, user, downloads] = await Promise.all([use("db"), use("user"), use("downloads")]);
+  S.db = db; S.user = user; S.downloads = downloads;
+  S.owner = user ? await user.isOwner() : false;
+  S.uid = user ? await user.id() : null;
+  if (S.owner) { $("tabs").hidden = false; startDash(); }
+  if (db && S.uid) {
+    S.canSave = true; S.saveMode = "cloud";
+    try {
+      const snap = await db.doc("responses/" + S.uid).get();
+      if (snap.exists && snap.data().done && !S.owner) { S.done = true; }
+    } catch (e) { /* treat as fresh */ }
+  } else if (SHEET_ON) {
+    S.saveMode = "sheet";
+    try { if (localStorage.getItem("lls-done") === "1") S.done = true; } catch (e) {}
+  } else { S.saveMode = "local"; }
+  renderSaveChip();
+  if (SHEET_ON && !S.db && location.hash === "#results") startSheetDash();
+}
+function renderSaveChip() {
+  const chip = $("save-chip");
+  if (S.done) { setChip(chip, "ok", "Your survey is already recorded"); $("btn-start").textContent = "Play again (not recorded)"; $("intro-note").textContent = "Each observer is recorded once. Replays are just for fun."; return; }
+  if (S.saveMode === "cloud" || S.saveMode === "sheet") setChip(chip, "ok", "Results save to the class automatically");
+  else if (S.saveMode === "local") setChip(chip, "warn", "You will copy your results at the end");
+  else setChip(chip, "", "Checking data saving…");
+}
+initCaps();
+
+// ---------- Saving (one write at a time) ----------
+let saveChain = Promise.resolve();
+let run = null;
+function docBody() {
+  return { v: 1, startedAt: run.startedAt, updatedAt: Date.now(), done: run.done, screenW: Math.round(window.innerWidth), trials: run.trials };
+}
+function queueSave() {
+  if (!S.canSave || !run.recorded) return;
+  const body = docBody();
+  saveChain = saveChain.then(async () => {
+    try { await S.db.doc("responses/" + S.uid).set(body); }
+    catch (e) {
+      if (e && e.code === "unavailable") { await sleep(400 + Math.random() * 600); try { await S.db.doc("responses/" + S.uid).set(body); return; } catch (e2) {} }
+      S.canSave = false; S.saveMode = "local"; run.saveFailed = true;
+    }
+  });
+  return saveChain;
+}
+
+// ---------- Trial loop ----------
+let pending = null;
+const cv = $("scene");
+function respond(r) { if (pending) { const p = pending; pending = null; p(r); } }
+cv.addEventListener("pointerdown", e => {
+  if (!pending) return; e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  respond({ tap: true, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+});
+$("btn-none").addEventListener("click", () => respond({ tap: false }));
+
+async function trial(sc, label) {
+  $("progress").textContent = label; $("feedback").textContent = ""; $("feedback").className = "feedback";
+  $("phase").textContent = "Look at the cross";
+  const f = sizeCanvas(cv); drawFix(f.ctx, f.W, f.H); await sleep(FIX_MS);
+  $("phase").textContent = "Search"; drawScene(cv, sc); const t0 = performance.now(); await sleep(EXPOSE_MS);
+  const m = sizeCanvas(cv); drawMask(m.ctx, m.W, m.H, sc.seed); $("phase").textContent = "Tap where it was";
+  const shownAt = performance.now();
+  $("btn-none").disabled = false;
+  const r = await new Promise(res => { pending = res; });
+  $("btn-none").disabled = true;
+  const rt = Math.round(performance.now() - shownAt);
+  let found = null, fa = null;
+  if (sc.present) {
+    found = r.tap && Math.hypot(r.x - sc.x, (r.y - sc.y) * 0.75) <= HIT_R ? 1 : 0;
+    $("feedback").textContent = found ? "Found it" : (r.tap ? "Not there" : "There was one");
+    $("feedback").className = "feedback " + (found ? "hit" : "miss");
+  } else {
+    fa = r.tap ? 1 : 0;
+    $("feedback").textContent = fa ? "That scene was empty" : "Right, no beetle";
+    $("feedback").className = "feedback " + (fa ? "miss" : "hit");
+  }
+  $("phase").textContent = "Answer";
+  drawScene(cv, sc, { reveal: true, tap: r.tap ? r : null });
+  await sleep(REVEAL_MS);
+  return { s: sc.id, f: found, fa, x: r.tap ? +r.x.toFixed(3) : null, y: r.tap ? +r.y.toFixed(3) : null, rt };
+}
+
+async function startRun() {
+  const recorded = !S.done && !S.owner && !(run && run.finishedOnce);
+  const prevFinished = run && run.finishedOnce;
+  run = { startedAt: Date.now(), trials: [], done: false, recorded, finishedOnce: prevFinished, saveFailed: false };
+  show("v-game"); await sleep(50);
+  for (let i = 0; i < PRACTICE.length; i++) await trial(PRACTICE[i], `Practice ${i + 1} of ${PRACTICE.length}`);
+  const order = shuffle(SCENES);
+  for (let i = 0; i < order.length; i++) {
+    const rec = await trial(order[i], `Scene ${i + 1} of ${order.length}${recorded ? "" : " · not recorded"}`);
+    rec.o = i + 1; run.trials.push(rec);
+    if (i === order.length - 1) run.done = true;
+    queueSave();
+  }
+  run.done = true; run.finishedOnce = true;
+  if (recorded && S.saveMode === "cloud") await saveChain;
+  if (recorded && S.saveMode === "sheet") { $("phase").textContent = "Sending"; run.sent = await sendToSheet(); if (run.sent) { try { localStorage.setItem("lls-done", "1"); } catch (e) {} S.done = true; } }
+  finish();
+}
+$("btn-start").addEventListener("click", startRun);
+$("btn-again").addEventListener("click", startRun);
+
+// ---------- End screen ----------
+function myRowArrays(code) {
+  return run.trials.map(t => { const s = SCENE_BY_ID[t.s]; return [code, t.o, t.s, s.present, s.mm ?? "", s.contrast, t.f ?? "", t.fa ?? "", t.x ?? "", t.y ?? "", t.rt, Math.round(window.innerWidth)]; });
+}
+async function sendToSheet() {
+  const body = JSON.stringify({ rows: myRowArrays(localCode()) });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { await fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body }); return true; }
+    catch (e) { await sleep(800); }
+  }
+  return false;
+}
+function myRows(code) {
+  const byId = Object.fromEntries(SCENES.map(s => [s.id, s]));
+  return run.trials.map(t => { const s = byId[t.s]; return [code, t.o, t.s, s.present, s.mm ?? "", s.contrast, t.f ?? "", t.fa ?? "", t.x ?? "", t.y ?? "", t.rt, Math.round(window.innerWidth)].join(","); });
+}
+const CSV_HEAD = "student,trial,scene,target_present,beetle_mm,contrast,found,false_alarm,tap_x,tap_y,rt_ms,screen_w";
+function finish() {
+  show("v-end");
+  const tgt = run.trials.filter(t => t.f !== null);
+  const hits = tgt.reduce((a, t) => a + t.f, 0);
+  $("score").textContent = `${hits} / ${tgt.length}`;
+  const fa = run.trials.filter(t => t.fa === 1).length;
+  $("end-msg").textContent = `You also tapped on ${fa} of ${N_BLANK} empty scenes. Notice how your hits pile up on the right side of the plot: that S shape is what a binomial GLM describes.`;
+  $("my-chart").innerHTML = "";
+  $("my-chart").appendChild(chart(aggregate(run.trials.map(t => ({ scene: t.s, found: t.f }))), null));
+  const chip = $("end-chip");
+  $("fallback").hidden = true;
+  if (!run.recorded) setChip(chip, "", "This run was practice and was not recorded");
+  else if (S.saveMode === "cloud" && !run.saveFailed) setChip(chip, "ok", "Saved to the class data");
+  else if (S.saveMode === "sheet" && run.sent) setChip(chip, "ok", "Sent to the class data");
+  else {
+    setChip(chip, "warn", "Not saved automatically");
+    $("fallback").hidden = false;
+    $("csv-out").value = myRows(localCode()).join("\n");
+  }
+}
+$("btn-copy").addEventListener("click", () => {
+  const ta = $("csv-out");
+  const done = () => { $("copy-msg").textContent = "Copied. Paste into the class sheet."; };
+  try { navigator.clipboard.writeText(ta.value).then(done, () => { ta.focus(); ta.select(); $("copy-msg").textContent = "Selected. Copy it with your device's copy command."; }); }
+  catch (e) { ta.focus(); ta.select(); $("copy-msg").textContent = "Selected. Copy it with your device's copy command."; }
+});
+
+// ---------- Aggregation, GLM, chart ----------
+const SCENE_BY_ID = Object.fromEntries(SCENES.map(s => [s.id, s]));
+function aggregate(rows) {
+  const g = {};
+  for (const r of rows) { const s = SCENE_BY_ID[r.scene]; if (!s || !s.present || r.found == null) continue;
+    const k = s.contrast + "|" + s.mm; (g[k] = g[k] || { contrast: s.contrast, mm: s.mm, n: 0, k: 0 }); g[k].n++; g[k].k += r.found; }
+  return Object.values(g);
+}
+function fitGLM(rows) {
+  // found ~ mm + conspicuous, Newton-Raphson (IRLS)
+  const X = [], y = [];
+  for (const r of rows) { const s = SCENE_BY_ID[r.scene]; if (!s || !s.present || r.found == null) continue; X.push([1, s.mm, s.contrast === "conspicuous" ? 1 : 0]); y.push(r.found); }
+  if (y.length < 20) return null;
+  const ybar = y.reduce((a, b) => a + b, 0) / y.length; if (ybar === 0 || ybar === 1) return null;
+  let b = [Math.log(ybar / (1 - ybar)), 0, 0];
+  for (let it = 0; it < 30; it++) {
+    const H = [[0,0,0],[0,0,0],[0,0,0]], g = [0,0,0];
+    for (let i = 0; i < y.length; i++) { const eta = X[i][0]*b[0] + X[i][1]*b[1] + X[i][2]*b[2]; const p = 1 / (1 + Math.exp(-eta)); const w = p * (1 - p);
+      for (let a = 0; a < 3; a++) { g[a] += (y[i] - p) * X[i][a]; for (let c = 0; c < 3; c++) H[a][c] += w * X[i][a] * X[i][c]; } }
+    for (let a = 0; a < 3; a++) H[a][a] += 1e-8;
+    const d = solve3(H, g); if (!d) return null;
+    b = b.map((v, i) => v + d[i]);
+    if (Math.max(...d.map(Math.abs)) < 1e-8) break;
+  }
+  if (b.some(v => !isFinite(v) || Math.abs(v) > 50)) return null;
+  return b;
+}
+function solve3(A, v) {
+  const M = A.map((r, i) => [...r, v[i]]);
+  for (let c = 0; c < 3; c++) { let p = c; for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-12) return null; [M[c], M[p]] = [M[p], M[c]];
+    for (let r = 0; r < 3; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k < 4; k++) M[r][k] -= f * M[c][k]; } }
+  return [M[0][3] / M[0][0], M[1][3] / M[1][1], M[2][3] / M[2][2]];
+}
+function chart(agg, beta) {
+  const NS = "http://www.w3.org/2000/svg", Wd = 560, Ht = 300, m = { l: 48, r: 16, t: 14, b: 44 };
+  const xmin = 4, xmax = 30, sx = v => m.l + (v - xmin) / (xmax - xmin) * (Wd - m.l - m.r), sy = v => m.t + (1 - v) * (Ht - m.t - m.b);
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", `0 0 ${Wd} ${Ht}`); svg.setAttribute("class", "chart");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Proportion of beetles found against beetle length");
+  const el = (n, a, txt) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; };
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) { el("line", { x1: m.l, x2: Wd - m.r, y1: sy(v), y2: sy(v), stroke: "var(--line)", "stroke-width": v === 0.5 ? 1.2 : 0.8, "stroke-dasharray": v === 0.5 ? "4 4" : "" });
+    el("text", { x: m.l - 8, y: sy(v) + 4, "text-anchor": "end", fill: "var(--muted)", "font-size": 12, "font-family": "var(--mono)" }, v.toFixed(2)); }
+  for (const v of [5, 10, 15, 20, 25, 30]) el("text", { x: sx(v), y: Ht - m.b + 18, "text-anchor": "middle", fill: "var(--muted)", "font-size": 12, "font-family": "var(--mono)" }, v);
+  el("text", { x: (m.l + Wd - m.r) / 2, y: Ht - 6, "text-anchor": "middle", fill: "var(--muted)", "font-size": 12, "font-family": "var(--body)" }, "Beetle length (mm)");
+  el("text", { x: 14, y: (m.t + Ht - m.b) / 2, "text-anchor": "middle", fill: "var(--muted)", "font-size": 12, "font-family": "var(--body)", transform: `rotate(-90 14 ${(m.t + Ht - m.b) / 2})` }, "Proportion found");
+  const col = c => c === "camouflaged" ? "var(--camo)" : "var(--consp)";
+  if (beta) for (const c of CONTRASTS) {
+    let d = ""; for (let i = 0; i <= 60; i++) { const v = xmin + (xmax - xmin) * i / 60; const p = 1 / (1 + Math.exp(-(beta[0] + beta[1] * v + (c === "conspicuous" ? beta[2] : 0)))); d += (i ? "L" : "M") + sx(v).toFixed(1) + " " + sy(p).toFixed(1); }
+    el("path", { d, fill: "none", stroke: col(c), "stroke-width": 2.5 });
+  }
+  const nmax = Math.max(1, ...agg.map(a => a.n));
+  for (const a of agg) { const off = a.contrast === "camouflaged" ? -3 : 3;
+    el("circle", { cx: sx(a.mm) + off, cy: sy(a.k / a.n), r: 3.5 + 5 * Math.sqrt(a.n / nmax), fill: col(a.contrast), "fill-opacity": 0.8, stroke: "var(--surface)", "stroke-width": 1 }); }
+  return svg;
+}
+
+// ---------- Dashboard (owner) ----------
+let dashDocs = [], dashStarted = false;
+function startDash() {
+  if (dashStarted || !S.db) return; dashStarted = true;
+  S.db.collection("responses").onSnapshot(snap => { dashDocs = snap.docs.filter(d => d.exists).map(d => ({ id: d.id, ...d.data() })); renderDash(); },
+    () => { $("dash-msg").textContent = "Live updates stopped. Reload the page to reconnect."; });
+}
+function classRows() {
+  const docs = dashDocs.slice().sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+  const rows = [];
+  docs.forEach((d, i) => { const code = "S" + String(i + 1).padStart(2, "0");
+    (d.trials || []).forEach(t => rows.push({ code, d, t, scene: t.s, found: t.f, fa: t.fa })); });
+  return rows;
+}
+function renderDash() {
+  const rows = classRows();
+  $("d-obs").textContent = dashDocs.filter(d => d.done).length;
+  $("d-live").textContent = dashDocs.filter(d => !d.done).length;
+  $("d-trials").textContent = rows.filter(r => r.found != null).length;
+  const blanks = rows.filter(r => r.fa != null);
+  $("d-fa").textContent = blanks.length ? Math.round(100 * blanks.filter(r => r.fa === 1).length / blanks.length) + "%" : "–";
+  const beta = fitGLM(rows);
+  $("class-chart").innerHTML = ""; $("class-chart").appendChild(chart(aggregate(rows), beta));
+  const box = $("est-box"); box.innerHTML = "";
+  if (beta) {
+    const l50 = c => -(beta[0] + (c ? beta[2] : 0)) / beta[1];
+    const t = document.createElement("table"); t.className = "est";
+    const tr = cells => { const r = document.createElement("tr"); cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; r.appendChild(td); }); t.appendChild(r); };
+    const head = document.createElement("tr"); ["Term", "Estimate (logit)", "Odds multiplier"].forEach(h => { const th = document.createElement("th"); th.textContent = h; head.appendChild(th); }); t.appendChild(head);
+    tr(["Intercept", beta[0].toFixed(2), "–"]);
+    tr(["Per mm of length", beta[1].toFixed(3), "× " + Math.exp(beta[1]).toFixed(2)]);
+    tr(["Conspicuous vs camouflaged", beta[2].toFixed(2), "× " + Math.exp(beta[2]).toFixed(2)]);
+    tr(["50% detection, camouflaged", l50(0).toFixed(1) + " mm", ""]);
+    tr(["50% detection, conspicuous", l50(1).toFixed(1) + " mm", ""]);
+    box.appendChild(t);
+  } else {
+    const p = document.createElement("p"); p.className = "small muted"; p.textContent = rows.length ? "The curve appears once there is enough data with both hits and misses." : "No searches yet. Share the link, and results appear here as students play.";
+    box.appendChild(p);
+  }
+}
+let sheetTimer = null;
+function startSheetDash() {
+  views.forEach(id => { $(id).hidden = id !== "v-dash"; });
+  $("btn-clear").hidden = true; $("d-live").parentNode.hidden = true;
+  $("dash-msg").textContent = "Updates every 5 seconds. To start fresh, clear the rows below the header in your Google Sheet.";
+  const pull = async () => {
+    try {
+      const r = await fetch(ENDPOINT); const j = await r.json(); const g = {};
+      (j.rows || []).forEach((row, i) => { const [code, o, sc, , , , f, fa, x, y, rt, sw] = row;
+        const d = (g[code] = g[code] || { id: String(code), startedAt: i, done: true, screenW: sw, trials: [] });
+        const num = v => (v === "" || v == null ? null : Number(v));
+        d.trials.push({ s: String(sc), o: num(o), f: num(f), fa: num(fa), x: num(x), y: num(y), rt: num(rt) }); });
+      dashDocs = Object.values(g); renderDash();
+    } catch (e) { $("dash-msg").textContent = "Could not reach the class sheet. Check the web app URL and that access is set to Anyone."; }
+  };
+  pull(); clearInterval(sheetTimer); sheetTimer = setInterval(pull, 5000);
+}
+function classCSV() {
+  const lines = [CSV_HEAD];
+  for (const r of classRows()) { const s = SCENE_BY_ID[r.t.s]; if (!s) continue;
+    lines.push([r.code, r.t.o, r.t.s, s.present, s.mm ?? "", s.contrast, r.t.f ?? "", r.t.fa ?? "", r.t.x ?? "", r.t.y ?? "", r.t.rt, r.d.screenW ?? ""].join(",")); }
+  return lines.join("\n") + "\n";
+}
+$("btn-dl").addEventListener("click", async () => {
+  const data = classCSV();
+  if (!S.downloads) {
+    try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "text/csv" })); a.download = "leaf_litter_search.csv"; document.body.appendChild(a); a.click(); a.remove(); $("dash-msg").textContent = "Downloaded leaf_litter_search.csv"; }
+    catch (e) { $("dl-fallback").hidden = false; $("dl-text").value = data; }
+    return;
+  }
+  try { await S.downloads.save({ filename: "leaf_litter_search.csv", data }); $("dash-msg").textContent = "Saved leaf_litter_search.csv"; }
+  catch (e) {
+    if (e && e.code === "declined") return;
+    $("dl-fallback").hidden = false; $("dl-text").value = data;
+  }
+});
+let clearArmed = false, clearT;
+$("btn-clear").addEventListener("click", async () => {
+  if (!clearArmed) { clearArmed = true; $("btn-clear").textContent = `Delete ${dashDocs.length} responses?`; clearT = setTimeout(() => { clearArmed = false; $("btn-clear").textContent = "Clear all responses"; }, 4000); return; }
+  clearTimeout(clearT); clearArmed = false; $("btn-clear").disabled = true; $("dash-msg").textContent = "Deleting…";
+  for (const d of dashDocs.slice()) { try { await S.db.doc("responses/" + d.id).delete(); } catch (e) {} }
+  $("btn-clear").disabled = false; $("btn-clear").textContent = "Clear all responses"; $("dash-msg").textContent = "All responses deleted.";
+});
+
+// ---------- Tabs ----------
+function setTab(which) {
+  $("tab-play").setAttribute("aria-selected", which === "play"); $("tab-dash").setAttribute("aria-selected", which === "dash");
+  if (which === "dash") { show("v-dash"); renderDash(); } else { show(run && run.finishedOnce ? "v-end" : "v-intro"); if (!$("v-intro").hidden) drawPreview(); }
+}
+$("tab-play").addEventListener("click", () => setTab("play"));
+$("tab-dash").addEventListener("click", () => setTab("dash"));
+})();
+</script>
+
+</body>
+</html>
